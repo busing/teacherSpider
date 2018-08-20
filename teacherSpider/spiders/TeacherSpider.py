@@ -1,7 +1,9 @@
-# -*- coding: UTF-8 -*-
+# coding: utf-8
 import scrapy
 from scrapy import FormRequest,Request
 from scrapy.spidermiddlewares.httperror import HttpError
+import os
+import re
 import sys  
 reload(sys)  
 import json
@@ -9,6 +11,7 @@ sys.setdefaultencoding('utf8')
 
 
 class TeacherSpider(scrapy.Spider):
+  replace_pattern = '[\\~|\\!|\\@|\\#|\\$|\\%|\\^|\\&|\\(|\\)|\\_|\\+|\\?|\\>|\\<|\u3002]*'
   name = "teacher"
   allowed_domains=["login.51talk.com"]
   start_urls=["https://www.51talk.com/reserve/upcourse/155890814"]
@@ -37,31 +40,42 @@ class TeacherSpider(scrapy.Spider):
     "Hm_lpvt_cd5cd03181b14b3269f31c9cc8fe277f": "153448418"
   }
   class_name_dict = {
-    545382:'经典英语青少版 Level 5',
-    8594:'经典英语 Level 2',
-    8595:'经典英语 Level 3',
-    8770:'经典英语 Level 4',
-    8771:'经典英语 Level 5',
-    8899:'经典英语 Level 6',
-    324263:'青少全能新概念',
-    319781:'自然拼读',
-    24:'商务英语・Business English Conversation',
-    6961:'面试口语・Interview English',
-    27:'新学科英语・New Subject English',
-    28:'雅思口语・IELTS Speaking',
-    440871:'分级阅读 Leveled Reading',
-    23:'综合英语・Comprehensive English',
-    29:'自由会话・Freetalk【适合中高级水平学员】',
-    328323:'生活口语',
-    328553:'旅游英语'
+    545382:u'经典英语青少版 Level 5',
+    8594:u'经典英语 Level 2',
+    8595:u'经典英语 Level 3',
+    8770:u'经典英语 Level 4',
+    8771:u'经典英语 Level 5',
+    8899:u'经典英语 Level 6',
+    324263:u'青少全能新概念',
+    319781:u'自然拼读',
+    24:u'商务英语・Business English Conversation',
+    6961:u'面试口语・Interview English',
+    27:u'新学科英语・New Subject English',
+    28:u'雅思口语・IELTS Speaking',
+    440871:u'分级阅读 Leveled Reading',
+    23:u'综合英语・Comprehensive English',
+    29:u'自由会话・Freetalk【适合中高级水平学员】',
+    328323:u'生活口语',
+    328553:u'旅游英语'
   }
-  print class_name_dict[328553]
-  # class_id=[545382,8594,8595,8770,8771,8899,324263,319781,24,6961,27,28,440871,23,29,328323,328553]
-  class_id=[8594,328553]
+  class_name_dict = {
+    # 440871:u'分级阅读 Leveled Reading'
+    6961:u'面试口语・Interview English'
+  }
+  class_id=[545382,8594,8595,8770,8771,8899,324263,319781,24,6961,27,28,440871,23,29,328323,328553]
+  # class_id=[328553]
+  class_path =u'F:\\课件下载\\'
 
 
   def start_requests(self):
-    for cid in self.class_id:
+    if not os.path.exists(self.class_path):
+      os.mkdir(self.class_path)
+      pass
+    for cid in self.class_name_dict:
+      self.class_name_path = self.class_path+'\\'+self.class_name_dict[cid]
+      if not os.path.exists(self.class_name_path):
+        os.mkdir(self.class_name_path)
+      print 'start crawl class '+self.class_name_dict[cid]
       yield scrapy.FormRequest(url=self.get_course_new_url,formdata={
           'course_id':str(cid),
           'appoint_course_id':'8818'
@@ -71,16 +85,29 @@ class TeacherSpider(scrapy.Spider):
   def get_class_info(self,response):
     json_class = json.loads(response.text.decode('ascii'))
     json_data = json_class['data']
+    # print json_class
     for key in json_data:
       if len(json_data[key]['children']) > 0:
-        print '-------------------'+json_data[key]['name']+'-------------------'
-        clss = json_data[key]['children']
-        for c in clss:
-          print c['name']
-        print '------------------- end -------------------\n\n'
+        try:
+          folder_name = self.class_name_path+'\\'+self.replaceSymbol(json_data[key]['name'])
+          print '-------------------'+folder_name+'-------------------'
+          if not os.path.exists(folder_name):
+            os.mkdir(folder_name)
+          clss = json_data[key]['children']
+          for c in clss:
+            # print c
+            # print c['name']
+            os.mkdir(folder_name+'\\'+c['name'])
+            # pass
+          print '------------------- end -------------------\n\n'
+        except BaseException as e:
+          # print json_data
+          print e.message
       else:
-        print json_data[key]['name']
-
+        folder_name = self.replaceSymbol(self.class_name_path+'\\'+json_data[key]['name'])
+        if not os.path.exists(folder_name):
+          os.mkdir(folder_name)
+        # print json_data[key]['name']
     # print json_class['data']
 
   def errback(self,failure):
@@ -90,3 +117,10 @@ class TeacherSpider(scrapy.Spider):
 
   def parse_login(self,response):
     print response.body
+
+
+  def replaceSymbol(self,str):
+    str = str.strip()
+    str= re.sub(self.replace_pattern,'',str)
+    str= re.sub(' ','-',str)
+    return str
