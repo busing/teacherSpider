@@ -4,6 +4,7 @@ from scrapy import FormRequest,Request
 from scrapy.spidermiddlewares.httperror import HttpError
 import os
 import re
+import time
 import sys  
 reload(sys)  
 import json
@@ -11,9 +12,11 @@ sys.setdefaultencoding('utf8')
 
 
 class TeacherSpider(scrapy.Spider):
+  book_download_url='http://www.51talk.com/download/book?course_id='
+  audio_download_url='https://static.51talk.com/upload/efl_audio/zip/talk'
   replace_pattern = '[\\~|\\!|\\@|\\#|\\$|\\%|\\^|\\&|\\(|\\)|\\_|\\+|\\?|\\>|\\<|\u3002]*'
   name = "teacher"
-  allowed_domains=["login.51talk.com"]
+  allowed_domains=["login.51talk.com","www.51talk.com"]
   start_urls=["https://www.51talk.com/reserve/upcourse/155890814"]
   get_course_new_url = "https://www.51talk.com/ajax/getCourseNew"
   login_url = "https://login.51talk.com/ajax/login"
@@ -40,7 +43,6 @@ class TeacherSpider(scrapy.Spider):
     "Hm_lpvt_cd5cd03181b14b3269f31c9cc8fe277f": "153448418"
   }
   class_name_dict = {
-    545382:u'经典英语青少版 Level 5',
     8594:u'经典英语 Level 2',
     8595:u'经典英语 Level 3',
     8770:u'经典英语 Level 4',
@@ -54,17 +56,13 @@ class TeacherSpider(scrapy.Spider):
     28:u'雅思口语・IELTS Speaking',
     440871:u'分级阅读 Leveled Reading',
     23:u'综合英语・Comprehensive English',
-    29:u'自由会话・Freetalk【适合中高级水平学员】',
     328323:u'生活口语',
     328553:u'旅游英语'
   }
-  class_name_dict = {
-    # 440871:u'分级阅读 Leveled Reading'
-    6961:u'面试口语・Interview English'
-  }
-  class_id=[545382,8594,8595,8770,8771,8899,324263,319781,24,6961,27,28,440871,23,29,328323,328553]
-  # class_id=[328553]
-  class_path =u'F:\\课件下载\\'
+  # class_name_dict = {
+  #   28:u'雅思口语・IELTS Speaking'
+  # }
+  class_path =u'/Users/taiyuan/Documents/51talkClass'
 
 
   def start_requests(self):
@@ -72,9 +70,6 @@ class TeacherSpider(scrapy.Spider):
       os.mkdir(self.class_path)
       pass
     for cid in self.class_name_dict:
-      self.class_name_path = self.class_path+'\\'+self.class_name_dict[cid]
-      if not os.path.exists(self.class_name_path):
-        os.mkdir(self.class_name_path)
       print 'start crawl class '+self.class_name_dict[cid]
       yield scrapy.FormRequest(url=self.get_course_new_url,formdata={
           'course_id':str(cid),
@@ -84,29 +79,54 @@ class TeacherSpider(scrapy.Spider):
 
   def get_class_info(self,response):
     json_class = json.loads(response.text.decode('ascii'))
-    json_data = json_class['data']
     # print json_class
+    json_data = json_class['data']
     for key in json_data:
+      tree_parent_id = json_data[key]['tree_parent_id']
+      class_name_path = self.class_path+'/'+self.class_name_dict[tree_parent_id]
+      self.check_folder(class_name_path)
       if len(json_data[key]['children']) > 0:
         try:
-          folder_name = self.class_name_path+'\\'+self.replaceSymbol(json_data[key]['name'])
-          print '-------------------'+folder_name+'-------------------'
-          if not os.path.exists(folder_name):
-            os.mkdir(folder_name)
+          folder_name = class_name_path+'/'+self.replaceSymbol(json_data[key]['name'])
+          self.check_folder(folder_name)
           clss = json_data[key]['children']
           for c in clss:
-            # print c
             # print c['name']
-            os.mkdir(folder_name+'\\'+c['name'])
-            # pass
-          print '------------------- end -------------------\n\n'
+            self.check_folder(folder_name+'/'+c['name'])
+            fo = open(folder_name+'/'+c['name']+'/info.txt','w')
+            fo.write('id:%s\n' % c['id'])
+            fo.write('name:%s\n' % c['name'])
+            fo.write('student_book:%s\n' % c['student_book'])
+            fo.write('student_book_url:%s\n' % (self.book_download_url+c['id']))
+            for i in range(0,3):
+              fo.write('audio_url:%s\n' % (self.audio_download_url+str(i)+c['id']+'.zip'))
+            fo.write('teacher_book:%s\n' % c['teacher_book'])
+            fo.write('teacher_book_prefix:%s\n' % c['teacher_book_prefix'])
+
+            ## download files
+            pdfRequest= Request(
+                url=self.book_download_url+c['id'],
+                callback=self.save_pdf,
+                errback = self.save_pdf_err
+            )
+            pdfRequest.meta['savePath']=folder_name+'/'+c['student_book']
+            yield pdfRequest
+            if c['video_info'] != '':
+              video_json = json.loads(c['video_info'])
+              if video_json['video_info_name'] != '':
+                fo.write('video_info_name:%s\n' % video_json['video_info_name'])
+              if video_json['video_info_file'] != '':
+                fo.write('video_info_file:%s\n' % video_json['video_info_file'])
+              pass
+
+           
+            pass
         except BaseException as e:
           # print json_data
           print e.message
       else:
-        folder_name = self.replaceSymbol(self.class_name_path+'\\'+json_data[key]['name'])
-        if not os.path.exists(folder_name):
-          os.mkdir(folder_name)
+        folder_name = class_name_path+'/'+self.replaceSymbol(json_data[key]['name'])
+        self.check_folder(folder_name)
         # print json_data[key]['name']
     # print json_class['data']
 
@@ -124,3 +144,19 @@ class TeacherSpider(scrapy.Spider):
     str= re.sub(self.replace_pattern,'',str)
     str= re.sub(' ','-',str)
     return str
+
+
+  def check_folder(self,path):
+    if not os.path.exists(path):
+      os.mkdir(path)
+
+
+  def save_pdf(self,response):
+    print 'save pdf'
+    save_path = response.meta['savePath']
+    with open(save_path, 'wb') as f:
+      f.write(response.body)
+    pass
+
+  def save_pdf_err(self,response):
+    print 'save_pdf_err'
