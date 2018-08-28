@@ -48,16 +48,16 @@ class TeacherSpider(scrapy.Spider):
     8770:u'经典英语 Level 4',
     8771:u'经典英语 Level 5',
     8899:u'经典英语 Level 6',
-    324263:u'青少全能新概念',
-    319781:u'自然拼读',
-    24:u'商务英语・Business English Conversation',
-    6961:u'面试口语・Interview English',
-    27:u'新学科英语・New Subject English',
-    28:u'雅思口语・IELTS Speaking',
-    440871:u'分级阅读 Leveled Reading',
-    23:u'综合英语・Comprehensive English',
-    328323:u'生活口语',
-    328553:u'旅游英语'
+    # 324263:u'青少全能新概念',
+    # 319781:u'自然拼读',
+    # 24:u'商务英语・Business English Conversation',
+    # 6961:u'面试口语・Interview English',
+    # 27:u'新学科英语・New Subject English',
+    # 28:u'雅思口语・IELTS Speaking',
+    # 440871:u'分级阅读 Leveled Reading',
+    # 23:u'综合英语・Comprehensive English',
+    # 328323:u'生活口语',
+    # 328553:u'旅游英语'
   }
   # class_name_dict = {
   #   28:u'雅思口语・IELTS Speaking'
@@ -73,7 +73,7 @@ class TeacherSpider(scrapy.Spider):
       print 'start crawl class '+self.class_name_dict[cid]
       yield scrapy.FormRequest(url=self.get_course_new_url,formdata={
           'course_id':str(cid),
-          'appoint_course_id':'8818'
+          'appoint_course_id':'8910'
         },callback=self.get_class_info,errback=self.errback,method='post',cookies=self.login_cookies)
 
 
@@ -83,55 +83,29 @@ class TeacherSpider(scrapy.Spider):
     json_data = json_class['data']
     for key in json_data:
       tree_parent_id = json_data[key]['tree_parent_id']
-      class_name_path = self.class_path+'/'+self.class_name_dict[tree_parent_id]
-      self.check_folder(class_name_path)
+      fo = open(('%s/%s.txt' % (self.class_path,self.class_name_dict[tree_parent_id])),'a')
+      fo.write('-----------'+self.class_name_dict[tree_parent_id]+'-----------\n')
       if len(json_data[key]['children']) > 0:
         try:
-          folder_name = class_name_path+'/'+self.replaceSymbol(json_data[key]['name'])
-          self.check_folder(folder_name)
           clss = json_data[key]['children']
+          fo.write(self.replaceSymbol('['+json_data[key]['name'])+']'+'\n\n')
           for c in clss:
             # print c['name']
-            lession_path=folder_name+'/'+c['name']
-            self.check_folder(lession_path)
-            fo = open(lession_path+'/info.txt','w')
             fo.write('id:%s\n' % c['id'])
             fo.write('name:%s\n' % c['name'])
-            fo.write('student_book:%s\n' % c['student_book'])
             fo.write('student_book_url:%s\n' % (self.book_download_url+c['id']))
             for i in range(0,3):
               fo.write('audio_url:%s\n' % (self.audio_download_url+str(i)+c['id']+'.zip'))
-            fo.write('teacher_book:%s\n' % c['teacher_book'])
-            fo.write('teacher_book_prefix:%s\n' % c['teacher_book_prefix'])
-
-            ## download files
-            pdfRequest= Request(
-                url=self.book_download_url+c['id'],
-                callback=self.save_pdf,
-                errback = self.save_pdf_err
-            )
-            pdfRequest.meta['savePath']=lession_path+'/'+c['student_book']
-            time.sleep(2)
-            yield pdfRequest
-            if c['video_info'] != '':
-              video_json = json.loads(c['video_info'])
-              if video_json['video_info_name'] != '':
-                fo.write('video_info_name:%s\n' % video_json['video_info_name'])
-              if video_json['video_info_file'] != '':
-                fo.write('video_info_file:%s\n' % video_json['video_info_file'])
-              pass
-
-           
+            fo.write('\n\n')
             pass
         except BaseException as e:
           # print json_data
           print e.message
       else:
-        folder_name = class_name_path+'/'+self.replaceSymbol(json_data[key]['name'])
-        self.check_folder(folder_name)
+        pass
         # print json_data[key]['name']
     # print json_class['data']
-
+  
   def errback(self,failure):
     print '>>>>>>>>>>>>>>>request error'
     print failure
