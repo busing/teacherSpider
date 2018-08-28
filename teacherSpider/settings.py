@@ -13,6 +13,8 @@ BOT_NAME = 'teacherSpider'
 
 SPIDER_MODULES = ['teacherSpider.spiders']
 NEWSPIDER_MODULE = 'teacherSpider.spiders'
+LOG_LEVEL= 'INFO'
+LOG_FILE = "mySpider.log"
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
