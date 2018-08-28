@@ -21,26 +21,26 @@ class TeacherSpider(scrapy.Spider):
   get_course_new_url = "https://www.51talk.com/ajax/getCourseNew"
   login_url = "https://login.51talk.com/ajax/login"
   login_cookies ={
-    "uuid": "3618b921c77f2687074db74519537aff",
-    "SpMLdaPx_uuid": "4634820150",
-    "global": "fec411e4-959d-4b11-b722-c1fee2f031ca",
-    "NTKF_T2D_CLIENTID": "guest86A6A7E1-B0C8-45DC-70B2-FA038F8FC0F0",
-    "uuid": "eyJpdiI6Ik55UTh4bjJONFJGdzR6cmRubXVkbWc9PSIsInZhbHVlIjoiRFZpZW5IWkxsNHJVNGpNNWNDRhvSzJaUDRBclJqRERjS1wvMVJwd1l2cU10RWNYek1BaUJPTGxlRjlvUU54a1QiLCJtYWMiOiJjMWM5Mzk2OTEyNDU0NzM1YTU5M2I3M2JjYzI3NTUzZWVjNmMxMzEzMTExOWJkODNjMWJhNDA1ZTIwNTFlM2E4In0=",
-    "unique_id": "5ab18bc54e61c55a783e7c284e67dc62",
-    "__utma": "108070726.1219921113.1533194769.1534315320.1534320912.7",
-    "__utmz": "108070726.1534320912.7.5.utmcsr=51talk.com|utmccn=(referral)|utmcmd=referral|utmcct=/",
-    "ust_v": "1",
-    "user_tk_checkFg": "1",
-    "SpMLdaPx_sid": "7812914912",
-    "servChkFlag": "sso",
-    "www_ugroup": "4",
-    "user_ust": "I+0RRTHmXM1zuffuF53FtsmbLvKAmyV9fqrcc900nDHKy7gRmztvzEljnx0VY9TNwkBNDwubfes/TfHFG0kMAWGo8H4wWXvCH9wHtp0=",
-    "user_usg": "MC0CFQDWFx3Ek2F8cpB3cYoU0UgCLWa/+wIUROoHfG/sc8VbX3f7UEzfRSLLFk0=",
-    "visitid": "10CF479F0F91066A073C0E2E57B9E211NNDTAF30MYTWEx1rNMzjMAO0O0Ox",
-    "SpMLdaPx_poid": "499",
-    "SpMLdaPx_pvid": "1534484186123",
-    "Hm_lvt_cd5cd03181b14b3269f31c9cc8fe277f": "1534317161,1534324635,1534484122,1534484186",
-    "Hm_lpvt_cd5cd03181b14b3269f31c9cc8fe277f": "153448418"
+    "price_show_type":"1",
+    "remember_user":"y",
+    "uuid":"280c8665-8b8b-4a17-a7e1-09798469e305",
+    "www_ugroup":"4",
+    "ust_v":"1",
+    "talk_user_id":"NNDTAF30MYTWEx1rNMzjMAO0O0Ox",
+    "SpMLdaPx_uuid":"4492958313",
+    "__utma":"108070726.35460673.1532522898.1532522898.1534247745.2",
+    "__utmz":"108070726.1534247745.2.2.utmcsr=51talk.com|utmccn=(referral)|utmcmd=referral|utmcct=/",
+    "aliyungf_tc":"AQAAACLmNmyXTwQAO/pBMQIMmxQJmcV3",
+    "Hm_lvt_cd5cd03181b14b3269f31c9cc8fe277f":"1534754640,1535023092,1535368448,1535439999",
+    "SpMLdaPx_sid":"6967973318",
+    "PHPSESSID":"4mam4nrv2rjc53h17glm3t2ff5",
+    "servChkFlag":"sso",
+    "user_ust":"I%2B0RRTHmXM1zuffuF53FtsmbLvKAmyV9fqrcc900nDHKy7gRmztvzElsqLYGIJ5T4ZTr4faiM%2FHJeOYrRyPsejgZ3AUw09sWBFMtrSw%3D",
+    "user_usg":"MC0CFFvBD6L7JMU6Tn%2FYsh3GpHy2Scc2AhUAhZ6RRQB8qchpXOFanrP%2FoRSj9W4%3D",
+    "visitid":"A02B1018A3E5F5E28252BC10468D1245NNDTAF30MYTWEx1rNMzjMAO0O0Ox",
+    "SpMLdaPx_poid":"47",
+    "SpMLdaPx_pvid":"1535440010199",
+    "Hm_lpvt_cd5cd03181b14b3269f31c9cc8fe277f":"1535440010"
   }
   class_name_dict = {
     8594:u'经典英语 Level 2',
@@ -92,8 +92,9 @@ class TeacherSpider(scrapy.Spider):
           clss = json_data[key]['children']
           for c in clss:
             # print c['name']
-            self.check_folder(folder_name+'/'+c['name'])
-            fo = open(folder_name+'/'+c['name']+'/info.txt','w')
+            lession_path=folder_name+'/'+c['name']
+            self.check_folder(lession_path)
+            fo = open(lession_path+'/info.txt','w')
             fo.write('id:%s\n' % c['id'])
             fo.write('name:%s\n' % c['name'])
             fo.write('student_book:%s\n' % c['student_book'])
@@ -109,7 +110,8 @@ class TeacherSpider(scrapy.Spider):
                 callback=self.save_pdf,
                 errback = self.save_pdf_err
             )
-            pdfRequest.meta['savePath']=folder_name+'/'+c['student_book']
+            pdfRequest.meta['savePath']=lession_path+'/'+c['student_book']
+            time.sleep(2)
             yield pdfRequest
             if c['video_info'] != '':
               video_json = json.loads(c['video_info'])
@@ -152,8 +154,8 @@ class TeacherSpider(scrapy.Spider):
 
 
   def save_pdf(self,response):
-    print 'save pdf'
     save_path = response.meta['savePath']
+    print 'save pdf :'+save_path
     with open(save_path, 'wb') as f:
       f.write(response.body)
     pass
