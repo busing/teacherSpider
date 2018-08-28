@@ -15,15 +15,25 @@ sys.setdefaultencoding('utf8')
 
 
 class TeacherSpider(scrapy.Spider):
+  # sign of stop download files
   stopCrawl = False
+  # prefix of url that download pdf 
   book_download_url='http://www.51talk.com/download/book?course_id='
+  
+  # prefix of url that download audio
   audio_download_url='https://static.51talk.com/upload/efl_audio/zip/talk'
+
+  # patten to replace special character,prevent fail on create folder
   replace_pattern = '[\\~|\\!|\\@|\\#|\\$|\\%|\\^|\\&|\\(|\\)|\\_|\\+|\\?|\\>|\\<|\u3002]*'
+  # name of crawl
   name = "teacher"
+
   allowed_domains=["login.51talk.com","www.51talk.com"]
   start_urls=["https://www.51talk.com/reserve/upcourse/155890814"]
   get_course_new_url = "https://www.51talk.com/ajax/getCourseNew"
   login_url = "https://login.51talk.com/ajax/login"
+
+  # cookie after login success
   login_cookies ={
     "price_show_type":"1",
     "remember_user":"y",
@@ -46,12 +56,14 @@ class TeacherSpider(scrapy.Spider):
     "SpMLdaPx_pvid":"1535440010199",
     "Hm_lpvt_cd5cd03181b14b3269f31c9cc8fe277f":"1535440010"
   }
+
+  # first level class catalog
   class_name_dict = {
-    # 8594:u'经典英语 Level 2',
-    # 8595:u'经典英语 Level 3',
-    # 8770:u'经典英语 Level 4',
+    8594:u'经典英语 Level 2',
+    8595:u'经典英语 Level 3',
+    8770:u'经典英语 Level 4',
     8771:u'经典英语 Level 5',
-    # 8899:u'经典英语 Level 6',
+    8899:u'经典英语 Level 6',
     # 324263:u'青少全能新概念',
     # 319781:u'自然拼读',
     # 24:u'商务英语・Business English Conversation',
@@ -66,10 +78,13 @@ class TeacherSpider(scrapy.Spider):
   # class_name_dict = {
   #   28:u'雅思口语・IELTS Speaking'
   # }
+  # folder path to save download files
   class_path =u'/Users/taiyuan/Documents/51talkClass'
 
 
+
   def start_requests(self):
+    # create folder for first level class 
     if not os.path.exists(self.class_path):
       os.mkdir(self.class_path)
       pass
@@ -78,50 +93,63 @@ class TeacherSpider(scrapy.Spider):
       if self.stopCrawl:
         log.msg('退出下载',level=log.INFO)
         return
+      # request 
       yield scrapy.FormRequest(url=self.get_course_new_url,formdata={
           'course_id':str(cid),
           'appoint_course_id':'8818'
         },callback=self.get_class_info,errback=self.errback,method='post',cookies=self.login_cookies)
 
 
+  # parse the sub class info 
   def get_class_info(self,response):
     json_class = json.loads(response.text.decode('ascii'))
-    # log.msg(json_class,level=log.INFO)
     json_data = json_class['data']
+    # traverse units under first level classes
     for key in json_data:
       if self.stopCrawl:
         log.msg('退出下载',level=log.INFO)
         return
       tree_parent_id = json_data[key]['tree_parent_id']
+      # folder path for unit
       class_name_path = self.class_path+'/'+self.class_name_dict[tree_parent_id]
       self.check_folder(class_name_path)
+
+      # get all class from unit
       if len(json_data[key]['children']) > 0:
         try:
           folder_name = class_name_path+'/'+self.replaceSymbol(json_data[key]['name'])
           self.check_folder(folder_name)
           clss = json_data[key]['children']
+          # traverse third sub classes
           for c in clss:
             if self.stopCrawl:
               log.msg('退出下载',level=log.INFO)
               return
-            # log.msg(c['name'],level=log.INFO)
+
             lession_path=folder_name+'/'+c['name']
+            # the folder of lession
             self.check_folder(lession_path)
+
+            # lession info
             fo = open(lession_path+'/info.txt','w')
             fo.write('id:%s\n' % c['id'])
             fo.write('name:%s\n' % c['name'])
             fo.write('student_book:%s\n' % c['student_book'])
             fo.write('student_book_url:%s\n' % (self.book_download_url+c['id']))
+
+            # may be there serval audio for one lession
             for i in range(0,3):
               fo.write('audio_url:%s\n' % (self.audio_download_url+str(i)+c['id']+'.zip'))
             fo.write('teacher_book:%s\n' % c['teacher_book'])
             fo.write('teacher_book_prefix:%s\n' % c['teacher_book_prefix'])
 
+            # download path of pdf file
             pdf_path = lession_path+'/'+c['student_book']
+            # valid if the pdf file exists ,and valid if the file is pdf ,because it will download as a pdf file even the server reponse the wirong message
             if self.isValidPDF_pathfile(pdf_path):
               log.msg('%s is exists, skiped ' % pdf_path,level=log.INFO)
               continue
-            ## download files
+            ## download pdf files
             pdfRequest= Request(
                 cookies=self.login_cookies,
                 url=self.book_download_url+c['id'],
@@ -140,15 +168,13 @@ class TeacherSpider(scrapy.Spider):
         # log.msg(json_data[key]['name'],level=log.INFO)
     # log.msg(json_class['data'],level=log.INFO)
 
+  # callbalc of start_requests
   def errback(self,failure):
     log.msg('>>>>>>>>>>>>>>>request error',level=log.INFO)
     log.msg(failure,level=log.INFO)
 
 
-  def parse_login(self,response):
-    log.msg(response.body,level=log.INFO)
-
-
+  # replace special characters to space
   def replaceSymbol(self,str):
     str = str.strip()
     str= re.sub(self.replace_pattern,'',str)
@@ -156,11 +182,14 @@ class TeacherSpider(scrapy.Spider):
     return str
 
 
+  # check if the folder is exists ,if not exists ,create it
   def check_folder(self,path):
     if not os.path.exists(path):
       os.mkdir(path)
 
 
+  # callback of request pdf download urls 
+  # if server response wirong message,change the stopCrawl as True ,so the application will not go on 
   def save_pdf(self,response):
     save_path = response.meta['savePath']
     log.msg('save pdf :'+save_path,level=log.INFO)
@@ -178,10 +207,13 @@ class TeacherSpider(scrapy.Spider):
       f.write(response.body)
     pass
 
+
+  # error callback of resquest pdf download urls
   def save_pdf_err(self,response):
     log.msg('save_pdf_err',level=log.ERROR)
 
 
+  # check the file is exists,and also check the file weither is a pdf
   def isValidPDF_pathfile(self,pathfile):
     bValid = True
     try:
